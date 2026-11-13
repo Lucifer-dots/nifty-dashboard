@@ -280,6 +280,7 @@ async function openChart(symbol, alert = null, interval = '5m') {
   $('#sheet-title').textContent += ` · ${r.as_of}`;
 }
 $('#sheet-close').onclick = closeSheet;
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => chart && chart.timeScale().fitContent(), 250); });
 $('#sheet').onclick = e => { if (e.target.id === 'sheet') closeSheet(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
