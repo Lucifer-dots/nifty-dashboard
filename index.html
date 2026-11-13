@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05080d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>RA Market Pulse</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="static/icon.svg">
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span>RA&nbsp;MARKET&nbsp;PULSE <small>analytics only</small></div>
+  <div id="mstatus" class="mstatus">connecting…</div>
+</header>
+<div id="ticker" class="ticker"></div>
+<nav id="tabs">
+  <button data-tab="pretrade" class="active">Pre-Trade</button>
+  <button data-tab="flow">Market Flow</button>
+  <button data-tab="options">Option Pulse</button>
+  <button data-tab="setups">Setups</button>
+  <button data-tab="calm">Calm Zone</button>
+  <button data-tab="screener">Screener</button>
+  <button data-tab="global">Gold &amp; BTC</button>
+</nav>
+<main>
+  <section id="tab-pretrade" class="tab active"></section>
+  <section id="tab-flow" class="tab"></section>
+  <section id="tab-options" class="tab"></section>
+  <section id="tab-setups" class="tab"></section>
+  <section id="tab-calm" class="tab"></section>
+  <section id="tab-screener" class="tab"></section>
+  <section id="tab-global" class="tab"></section>
+</main>
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><span id="modal-title"></span><button id="modal-close">✕</button></div>
+    <div id="chart"></div>
+    <div id="modal-why" class="why"></div>
+  </div>
+</div>
+<footer>Educational only. Not investment advice. No orders are placed from this app. Data: NSE public site and Yahoo Finance; may be delayed. <span id="updated"></span></footer>
+<script src="static/vendor/lightweight-charts.js"></script>
+<script src="static/app.js"></script>
+</body>
+</html>
