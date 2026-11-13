@@ -1,6 +1,6 @@
 // App-shell cache only. Data (JSON snapshots / API) is always fetched from the network,
 // so old numbers are never shown as if they were live.
-const C = 'ra-pulse-v5', SHELL = ['./', 'static/style.css?v=5', 'static/app.js?v=5', 'static/vendor/lightweight-charts.js', 'static/icon.svg'];
+const C = 'ra-pulse-v8', SHELL = ['./', 'static/style.css?v=8', 'static/app.js?v=8', 'static/vendor/lightweight-charts.js', 'static/icon.svg'];
 self.addEventListener('install', e => e.waitUntil(caches.open(C).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {

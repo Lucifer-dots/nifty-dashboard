@@ -120,3 +120,81 @@ ul{margin:6px 0;padding-left:18px}
 @media (max-width:370px){ .brand span:last-child{display:none} .ic .v{font-size:18px} }
 small{font-size:13px}
 @media (max-height:520px){.sheet{padding:0}.sheet-box{width:100%;height:100%;border-radius:0;border:0}#sheet-why{display:none}}
+
+/* ---------- compact type (about 15-20% smaller, tighter padding) ---------- */
+html,body{font-size:12.5px;line-height:1.4}
+.top{min-height:44px;padding:6px 10px;padding-top:max(6px,env(safe-area-inset-top));gap:6px}
+.brand,.hdr-nifty{font-size:12.5px}.snap,.lb{font-size:11px}
+@media (min-width:721px){nav{top:44px;padding:6px 10px}}
+nav button{min-height:40px;padding:0 11px;font-size:12px}
+main{padding:8px 8px 18px}
+.grid{gap:8px}
+.card{padding:10px;margin-bottom:8px;border-radius:10px}
+.card h3{font-size:11px;margin:0 0 7px}
+.big{font-size:21px}
+.badge,.pill{font-size:11px}.badge{padding:2px 6px}
+.unavail{padding:9px}
+.asof{font-size:11px;margin-top:6px}
+.idx{gap:6px;margin-bottom:8px}
+.ic{padding:7px 9px;border-radius:10px}
+.ic .l{font-size:11px}.ic .v{font-size:16px}.ic .c{font-size:12px}
+.num{flex-basis:26px;height:26px;font-size:12px}
+.check{gap:8px}
+.mood{font-size:22px}
+.reasons{margin-top:6px}.reasons li{margin:2px 0}
+.lvl{gap:6px;margin-top:6px}.lvl div{padding:6px 8px;border-radius:8px}
+.lvl span{font-size:11px}.lvl b{font-size:16px}
+.alert-top .sym{font-size:14px}
+.kv{gap:5px;margin:8px 0}.kv div{padding:5px 7px}
+.kv span{font-size:11px}.kv b{font-size:13px}
+.why{padding:8px;font-size:12px}.why b{font-size:11px}
+.tapcta{font-size:11px;margin-top:6px}
+.chips{margin-bottom:8px}
+.chips button{min-height:40px;padding:0 12px;font-size:12px}
+.row{min-height:44px;padding:6px 2px;gap:8px}
+.row .s b{font-size:13px}.row .s small{font-size:11px}.row .n{font-size:12px}
+.more{min-height:40px;font-size:12px}
+table{font-size:12px}
+th,td{padding:7px 8px}
+th{font-size:11px}
+.tiles{gap:6px}.tile{padding:8px}
+.tile svg{height:36px;margin:4px 0}
+.sheet-head{font-size:12.5px}
+.sheet-head button{flex-basis:40px;height:40px;font-size:16px}
+.disclaimer{font-size:11px;padding:9px;margin-top:14px}
+small{font-size:11px}
+@media (max-width:720px){
+  :root{--navh:56px}
+  html,body{font-size:12px}
+  nav{padding:4px 4px calc(4px + var(--safe-b))}
+  nav button{min-width:60px;min-height:46px;font-size:11px;padding:2px 4px}
+  nav button i{font-size:16px}
+  main{padding:8px 8px calc(var(--navh) + 18px + var(--safe-b))}
+  .big{font-size:20px}
+  .hdr-nifty{font-size:12px}
+}
+@media (max-width:370px){ .ic .v{font-size:15px} }
+
+/* money flow + order blocks */
+.sectors{margin-top:8px}
+.sec{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec .sn{min-width:0}.sec .sn b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.sec .sv{text-align:right;font-weight:700;white-space:nowrap;align-self:center}
+.sec .sb{grid-column:1/-1;display:flex;height:8px}
+.sec .half{flex:1;display:flex;background:#16212f}.sec .half.l{justify-content:flex-end;border-right:1px solid #3a4a60}
+.sec .half i{display:block;height:100%}.sec .half.l i{background:var(--r)}.sec .half.r i{background:var(--g)}
+.sec .sl{grid-column:1/-1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fno{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.ft{background:var(--panel2);border-left:3px solid;border-radius:8px;padding:6px 8px;min-width:0}
+.ft b{display:block;font-size:18px}.ft small{display:block}.ft .badge{font-size:11px;padding:1px 4px}
+.fchart{width:100%;height:124px;display:block;margin-top:6px}
+.fleg{display:flex;gap:12px;font-size:11px;color:var(--mut)}.fleg i{display:inline-block;width:10px;height:3px;margin-right:4px;vertical-align:middle}
+.row.ob .s b{white-space:normal}.row.ob .badge{font-size:11px;padding:1px 5px}
+.row.dead{opacity:.6}
+#oblayer{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.obz{position:absolute;border-top:1px solid;border-bottom:1px solid}
+.obz.bull{background:#00ff9c22;border-color:#00ff9c88}.obz.bear{background:#ff4d6a22;border-color:#ff4d6a88}
+.obz.dead{background:#8196ad18;border-color:#8196ad66;border-style:dashed}
+.obz.on{box-shadow:0 0 0 1px #ffe14d}
+.obz span{position:absolute;left:3px;top:0;font-size:11px;color:var(--txt);opacity:.85;white-space:nowrap}
