@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import analytics as A
 from . import sources as S
+from . import smc
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("app")
@@ -47,6 +48,16 @@ def api_flow():
 @app.get("/api/options")
 def api_options(symbol: str = Query("NIFTY", pattern="^(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY)$"), width: int = 10):
     return safe(A.option_chain, symbol, min(max(width, 3), 25))
+
+
+@app.get("/api/moneyflow")
+def api_moneyflow():
+    return safe(smc.money_flow)
+
+
+@app.get("/api/orderblocks")
+def api_orderblocks():
+    return safe(smc.order_blocks)
 
 
 @app.get("/api/setups")
@@ -108,7 +119,7 @@ def refresher():
     while True:
         t0 = time.time()
         for fn in (A.status, A.indices, A.stock_flow, lambda: A.option_chain("NIFTY"),
-                   lambda: A.option_chain("BANKNIFTY"), A.setups, A.calm_zone, A.screener, A.global_assets):
+                   lambda: A.option_chain("BANKNIFTY"), A.setups, smc.money_flow, smc.order_blocks, A.calm_zone, A.screener, A.global_assets):
             try:
                 fn()
             except Exception as e:

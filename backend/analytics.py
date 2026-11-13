@@ -335,11 +335,24 @@ def scan_symbol(sym, df):
                                    stop_why=f"Stop above {kind} ({stop:.2f})."))
                 break
     for a in alerts:
-        a["risk_pct"] = _r(abs(a["entry"] - a["stop"]) / a["entry"] * 100)
+        risk = abs(a["entry"] - a["stop"])
+        sign = 1 if a["side"] == "LONG" else -1
+        a["t1"], a["t2"] = _r(a["entry"] + sign * risk), _r(a["entry"] + sign * 2 * risk)  # 1R and 2R
+        a["risk_pct"] = _r(risk / a["entry"] * 100)
         a["entry"], a["stop"] = _r(a["entry"]), _r(a["stop"])
         a["session"] = day.index[0].strftime("%d-%b-%Y")
         bar = next(t for t in day.index if t.strftime("%H:%M") == a["time"])
         a["chart_time"] = int(bar.timestamp()) + 19800  # IST shown as chart-UTC
+        # Volume spike: trigger-bar volume vs the average of the previous 20 bars (stocks only;
+        # Yahoo has no index volume, so indices get None rather than a guess).
+        i = day.index.get_loc(bar)
+        vol = day["Volume"].fillna(0)
+        prior = vol.iloc[max(0, i - 20):i]
+        if vol.sum() > 0 and len(prior) >= 5 and prior.mean() > 0:
+            a["vol_ratio"] = _r(float(vol.iloc[i]) / float(prior.mean()), 1)
+            a["vol_spike"] = a["vol_ratio"] >= 2.0
+        else:
+            a["vol_ratio"], a["vol_spike"] = None, None
     return alerts
 
 
@@ -359,7 +372,8 @@ def setups():
     return ok({"alerts": alerts, "session": session, "universe": len(data),
                "rules": ["FIRST 5-MIN BREAK: close beyond 09:15-09:20 high/low and next close holds",
                          "VWAP RECLAIM/LOSS: 3+ closes on one side, then a close at least 0.1% across VWAP and the next close holds",
-                         "LATE STRENGTH/WEAKNESS: after 14:00, close at new day high/low, right side of VWAP, day move > 1%"]},
+                         "LATE STRENGTH/WEAKNESS: after 14:00, close at new day high/low, right side of VWAP, day move > 1%",
+                         "Targets: T1 = 1R, T2 = 2R from the trigger (R = trigger-to-stop distance). VOL SPIKE = trigger-bar volume >= 2x the prior 20-bar average"]},
               "Yahoo 5m candles (NIFTY, BANKNIFTY + NIFTY 50 stocks)")
 
 
@@ -370,17 +384,25 @@ def candles(name: str, interval="5m"):
             d = S.yf_download([sym], "6mo", "1d", f"yf:c1d:{sym}", S.ttl(600, 3600))[sym]
             day = d
             vw = None
+            obs = None
         else:
             d = S.yf_download([sym], "5d", "5m", f"yf:c5:{sym}", S.ttl(60, 900))[sym]
             day = with_vwap(last_session(d))
             vw = [{"time": int(t.timestamp()) + 19800, "value": _r(v)} for t, v in day["VWAP"].items()]
+            try:
+                from .smc import blocks_for
+                ob = blocks_for(d)
+                obs = [b for b in ob if b["status"] == "ACTIVE"] + \
+                    [b for b in ob if b["status"] != "ACTIVE" and b["status_t"] and b["status_t"] >= int(day.index[0].timestamp()) + 19800][-8:]
+            except Exception:
+                obs = None
     except Exception as e:
         return fail(e, "Yahoo")
     # lightweight-charts shows UTC; add +5:30 so the axis reads IST
     bars = [{"time": (int(t.timestamp()) + 19800) if interval != "1d" else t.strftime("%Y-%m-%d"),
              "open": _r(r.Open), "high": _r(r.High), "low": _r(r.Low), "close": _r(r.Close)}
             for t, r in day.iterrows()]
-    return ok({"symbol": pretty(sym), "interval": interval, "bars": bars, "vwap": vw,
+    return ok({"symbol": pretty(sym), "interval": interval, "bars": bars, "vwap": vw, "order_blocks": obs,
                "vwap_kind": (day["vwap_kind"].iloc[0] if vw else None)}, "Yahoo",
               as_of=(day.index[-1].strftime("%d-%b-%Y %H:%M IST") if interval != "1d" else
                      day.index[-1].strftime("%d-%b-%Y") + " daily bar") if len(day) else None)
