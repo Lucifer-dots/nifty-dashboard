@@ -99,8 +99,8 @@ async function loadPretrade() {
 // ---------------------------------------------------------------- market flow
 let flowFilter = 'ALL', flowData = null, flowShown = 40;
 async function loadFlow() {
-  const r = await api('/api/flow'), idx = lastIdx, el = $('#tab-flow');
-  let html = indexGrid(idx) + '<div class="grid">';
+  const [r, mf] = await Promise.all([api('/api/flow'), api('/api/moneyflow')]), idx = lastIdx, el = $('#tab-flow');
+  let html = moneyFlowHtml(mf) + '<div class="grid">';
   if (idx && idx.ok && idx.data.breadth) {
     const b = idx.data.breadth, t = b.nifty500_adv + b.nifty500_dec, ta = b.all_adv + b.all_dec;
     html += `<div class="card"><h3>Money flow · breadth</h3>
@@ -115,14 +115,12 @@ async function loadFlow() {
     flowData = r;
     const c = r.data.counts, tot = Object.values(c).reduce((a, b) => a + b, 0) || 1;
     const col = {'LONG BUILD-UP': 'var(--g)', 'SHORT COVERING': 'var(--b)', 'SHORT BUILD-UP': 'var(--r)', 'LONG UNWINDING': 'var(--o)'};
-    html += `<div class="card"><h3>F&amp;O OI build-up (${tot} stocks)</h3>
-      ${Object.entries(c).map(([k, v]) => `<div class="mixrow"><span class="badge ${TAG[k]}">${k}</span> <b>${v}</b><div class="bar"><i style="width:${v / tot * 100}%;background:${col[k]}"></i></div></div>`).join('')}
-      <div class="asof">${esc(r.data.note)} NSE OI ${esc(r.data.nse_oi_timestamp)}</div></div>
-      <div class="card span"><h3>Stock flow · price vs OI</h3>
+    html += `<div class="card span"><h3>Stock flow · price vs OI</h3>
       <div class="chips" id="flowchips">${['ALL', ...Object.keys(TAG)].map(k => `<button data-f="${k}" class="${k === flowFilter ? 'on' : ''}">${k}</button>`).join('')}</div>
       <div id="flowlist" class="rows"></div>${asof(r)}</div>`;
   } else html += `<div class="card"><h3>Stock flow</h3>${unavailable(r, 'F&O OI data')}</div>`;
-  el.innerHTML = html + '</div>';
+  el.innerHTML = html + '</div>' + `<h3 class="bl" style="font-size:11px;letter-spacing:1px;margin:12px 2px 6px">INDICES</h3>` + indexGrid(idx);
+  const sa = $('#secall'); if (sa) sa.onclick = () => { mfSectorsAll = !mfSectorsAll; loadFlow(); };
   el.querySelectorAll('#flowchips button').forEach(b => b.onclick = () => {
     flowFilter = b.dataset.f; flowShown = 40; renderFlowList();
     el.querySelectorAll('#flowchips button').forEach(x => x.classList.toggle('on', x === b));
@@ -137,6 +135,128 @@ function renderFlowList() {
     (all.length > flowShown ? `<button class="more" id="flowmore">Show more (${all.length - flowShown})</button>` : '');
   $('#flowlist').querySelectorAll('.row').forEach(x => x.onclick = () => openChart(x.dataset.sym));
   const m = $('#flowmore'); if (m) m.onclick = () => { flowShown += 60; renderFlowList(); };
+}
+
+// ---------------------------------------------------------------- money flow (sector in/out, F&O build-up, MFI / delta)
+const cr = x => x == null ? '—' : (Math.abs(x) >= 1000 ? fmt(x / 1000, 1) + 'k' : fmt(x, 0)) + ' Cr';
+let mfSectorsAll = false;
+function flowChart(s) {  // two panels: cumulative delta (Rs Cr) and MFI 0-100
+  const pts = s.series.filter(p => p.cd != null); if (pts.length < 3) return '';
+  const W = 320, H1 = 70, H2 = 46, G = 8, n = pts.length - 1;
+  const cds = pts.map(p => p.cd), mn = Math.min(0, ...cds), mx = Math.max(0, ...cds);
+  const x = i => (i / n * W).toFixed(1), y1 = v => (H1 - (mx === mn ? H1 / 2 : (v - mn) / (mx - mn) * (H1 - 4) + 2)).toFixed(1);
+  const zero = y1(0), line = pts.map((p, i) => `${x(i)},${y1(p.cd)}`).join(' ');
+  const last = cds[cds.length - 1], col = last >= 0 ? 'var(--g)' : 'var(--r)';
+  const mf = pts.map((p, i) => p.mfi == null ? null : `${x(i)},${(H1 + G + H2 - p.mfi / 100 * H2).toFixed(1)}`).filter(Boolean).join(' ');
+  const gy = v => (H1 + G + H2 - v / 100 * H2).toFixed(1);
+  return `<svg class="fchart" viewBox="0 0 ${W} ${H1 + G + H2}" preserveAspectRatio="none">
+    <line x1="0" x2="${W}" y1="${zero}" y2="${zero}" stroke="#2a3a50" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+    <polygon points="0,${zero} ${line} ${W},${zero}" fill="${col}" opacity=".15"/>
+    <polyline points="${line}" fill="none" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    <rect x="0" y="${gy(80)}" width="${W}" height="${(gy(20) - gy(80)).toFixed(1)}" fill="#3fb0ff0d"/>
+    <line x1="0" x2="${W}" y1="${gy(80)}" y2="${gy(80)}" stroke="#ff4d6a55" vector-effect="non-scaling-stroke"/>
+    <line x1="0" x2="${W}" y1="${gy(20)}" y2="${gy(20)}" stroke="#00ff9c55" vector-effect="non-scaling-stroke"/>
+    <polyline points="${mf}" fill="none" stroke="var(--y)" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>
+    <div class="fleg"><span><i style="background:${col}"></i>Cum. delta</span><span><i style="background:var(--y)"></i>MFI (80/20 bands)</span></div>`;
+}
+function moneyFlowHtml(mf) {
+  if (!mf || !mf.ok) return `<div class="card"><h3>Money flow</h3>${unavailable(mf, 'money flow')}</div>`;
+  const d = mf.data, S = d.sectors; let h = '';
+  if (S) {
+    const tot = (S.inflow_cr || 0) + (S.outflow_cr || 0) || 1, rows = mfSectorsAll ? S.rows : [...S.rows.slice(0, 6), ...S.rows.slice(-6)].filter((r, i, a) => a.indexOf(r) === i);
+    const mx = Math.max(...S.rows.map(r => Math.abs(r.net_cr || 0)), 1);
+    h += `<div class="card"><h3>Where money is going today</h3>
+      <div class="big ${S.net_cr >= 0 ? 'up' : 'dn'}">${S.net_cr >= 0 ? 'NET INFLOW' : 'NET OUTFLOW'} ${cr(Math.abs(S.net_cr))}</div>
+      <div class="mut">${esc((S.universe || "").split(" (")[0])} turnover: <b class="up">${cr(S.inflow_cr)} in</b> (stocks up) · <b class="dn">${cr(S.outflow_cr)} out</b> (stocks down)</div>
+      <div class="bar"><i style="width:${S.inflow_cr / tot * 100}%;background:var(--g)"></i><i style="width:${S.outflow_cr / tot * 100}%;background:var(--r)"></i></div>
+      <div class="sectors">${rows.map(r => `<div class="sec">
+        <div class="sn"><b>${esc(r.sector)}</b><small class="mut">${r.up}↑ ${r.down}↓ · ${pct(r.pct)}</small></div>
+        <div class="sv ${r.net_cr >= 0 ? 'up' : 'dn'}">${r.net_cr >= 0 ? '+' : '−'}${cr(Math.abs(r.net_cr))}</div>
+        <div class="sb"><div class="half l">${r.net_cr < 0 ? `<i style="width:${Math.abs(r.net_cr) / mx * 100}%"></i>` : ''}</div><div class="half r">${r.net_cr >= 0 ? `<i style="width:${r.net_cr / mx * 100}%"></i>` : ''}</div></div>
+        <div class="sl mut">${r.leaders.map(x => `${esc(x.symbol)} ${x.pct >= 0 ? '+' : ''}${fmt(x.pct, 1)}%`).join(' · ')}</div></div>`).join('')}</div>
+      ${S.rows.length > 12 ? `<button class="more" id="secall">${mfSectorsAll ? 'Show top and bottom only' : `Show all ${S.rows.length} sectors`}</button>` : ''}
+      <div class="asof">Net = turnover of rising stocks − falling stocks, ${S.stocks} ${esc(S.universe || "")} stocks · ${esc(S.as_of)}</div></div>`;
+  } else h += `<div class="card"><h3>Where money is going today</h3>${unavailable({error: (d.errors || []).join('; ')}, 'sector flow')}</div>`;
+  if (d.fno) {
+    const T = d.fno.tags, tc = T.reduce((a, t) => a + t.count, 0) || 1, tt = (d.fno.bull_cr + d.fno.bear_cr) || 1;
+    const col = {'LONG BUILD-UP': 'var(--g)', 'SHORT COVERING': 'var(--b)', 'SHORT BUILD-UP': 'var(--r)', 'LONG UNWINDING': 'var(--o)'};
+    h += `<div class="card"><h3>F&amp;O build-up · ${tc} stocks</h3>
+      <div class="mut">Bullish OI money <b class="up">${cr(d.fno.bull_cr)}</b> vs bearish <b class="dn">${cr(d.fno.bear_cr)}</b></div>
+      <div class="bar"><i style="width:${d.fno.bull_cr / tt * 100}%;background:var(--g)"></i><i style="width:${d.fno.bear_cr / tt * 100}%;background:var(--r)"></i></div>
+      <div class="fno">${T.map(t => `<div class="ft" style="border-color:${col[t.tag]}"><span class="badge ${TAG[t.tag]}">${t.tag}</span><b>${t.count}</b><small class="mut">${cr(t.turnover_cr)} turnover</small><div class="bar"><i style="width:${t.count / tc * 100}%;background:${col[t.tag]}"></i></div></div>`).join('')}</div>
+      <div class="asof">${esc(d.fno.source)} · OI ${esc(d.fno.as_of)}</div></div>`;
+  }
+  for (const k of ['NIFTY', 'BANKNIFTY']) {
+    const s = d.intraday && d.intraday[k];
+    if (!s) { h += `<div class="card"><h3>${k} · MFI &amp; delta</h3>${unavailable({error: 'no intraday data'}, k + ' money flow index')}</div>`; continue; }
+    const mcls = s.mfi > 80 ? 'dn' : s.mfi < 20 ? 'up' : s.mfi >= 55 ? 'up' : s.mfi <= 45 ? 'dn' : 'or';
+    h += `<div class="card"><h3>${k} · intraday money flow</h3>
+      <div class="kv"><div><span>MFI (14×5m)</span><b class="${mcls}">${fmt(s.mfi, 1)}</b></div><div><span>Reading</span><b class="${mcls}" style="font-size:11px;white-space:normal">${esc(s.mfi_state)}</b></div>
+      <div><span>Cum. delta</span><b class="${s.cum_delta_cr >= 0 ? 'up' : 'dn'}">${s.cum_delta_cr >= 0 ? '+' : ''}${cr(s.cum_delta_cr)}</b></div><div><span>Turnover</span><b>${cr(s.turnover_cr)}</b></div></div>
+      ${flowChart(s)}
+      <div class="asof">Volume proxy: 5-min turnover of ${s.constituents} ${k === 'NIFTY' ? 'NIFTY 50' : 'bank'} stocks (index volume isn't published) · ${esc(s.as_of)}</div></div>`;
+  }
+  return `<div class="grid">${h}</div>`;
+}
+
+// ---------------------------------------------------------------- order blocks
+let obType = 'ALL', obTf = 'ALL', obShown = 30, obData = null;
+const obRange = b => `${fmt(b.bottom)} – ${fmt(b.top)}`;
+function obRow(b, i, dead) {
+  const side = b.type === 'BULL', where = side ? (b.dist_pct >= 0 ? 'above zone' : 'inside') : (b.dist_pct >= 0 ? 'below zone' : 'inside');
+  return `<div class="row ob ${dead ? 'dead' : ''}" data-i="${i}" data-d="${dead ? 1 : 0}">
+    <div class="s"><b>${esc(b.symbol)} <span class="badge ${side ? 'b-lb' : 'b-sb'}">${side ? 'BULL OB' : 'BEAR OB'}</span> <span class="pill">${b.tf}</span></b>
+      <small class="mut">${obRange(b)} · formed ${esc(b.formed)}${dead ? ` · ${b.status} ${esc(b.status_at)}` : ''}</small></div>
+    <div class="n">${dead ? `<span class="badge ${b.status === 'BROKEN' ? 'b-sb' : 'b-y'}">${b.status}</span>` : `<b class="${Math.abs(b.dist_pct) < 0.5 ? 'or' : ''}">${fmt(Math.abs(b.dist_pct))}%</b><br><small class="mut">${where}</small>`}</div></div>`;
+}
+async function loadOB() {
+  const r = await api('/api/orderblocks'), el = $('#tab-ob');
+  if (!r.ok) { el.innerHTML = unavailable(r, 'order blocks'); return; }
+  obData = r; const c = r.data.counts;
+  const chip = (k, cur, v) => `<button data-${k}="${v}" class="${v === cur ? 'on' : ''}">${v}</button>`;
+  el.innerHTML = `<div class="idx">
+      <div class="ic"><div class="l">Active blocks</div><div class="v">${c.active}</div><div class="c"><span class="up">${c.bull} bull</span> · <span class="dn">${c.bear} bear</span></div></div>
+      <div class="ic"><div class="l">Mitigated / broken</div><div class="v mut">${c.mitigated_or_broken}</div><div class="c mut">last 5 sessions</div></div></div>
+    <div class="card"><h3>Active order blocks · nearest first</h3>
+      <div class="chips">${['ALL', 'BULL', 'BEAR'].map(v => chip('t', obType, v)).join('')}${['5m', '15m'].map(v => chip('f', obTf, v)).join('')}</div>
+      <div id="oblist" class="rows"></div></div>
+    <div class="card"><h3>Recently mitigated / broken</h3><div id="obdead" class="rows"></div></div>
+    <div class="card"><h3>How a block qualifies</h3><div class="mut">${esc(r.data.method)}</div><div class="asof">${esc(r.data.universe)} · ${esc(r.source)} · ${esc(r.as_of)}</div></div>`;
+  el.querySelectorAll('[data-t],[data-f]').forEach(b => b.onclick = () => {
+    if (b.dataset.t) obType = b.dataset.t; else obTf = obTf === b.dataset.f ? 'ALL' : b.dataset.f;
+    obShown = 30; loadOBList();
+    el.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === obType));
+    el.querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === obTf));
+  });
+  loadOBList();
+}
+function loadOBList() {
+  const f = b => (obType === 'ALL' || b.type === obType) && (obTf === 'ALL' || b.tf === obTf);
+  const act = obData.data.active.filter(f), dead = obData.data.recent_mitigated.filter(f).slice(0, 15);
+  $('#oblist').innerHTML = (act.slice(0, obShown).map((b, i) => obRow(b, i, false)).join('') || '<div class="mut">No active blocks for this filter.</div>') +
+    (act.length > obShown ? `<button class="more" id="obmore">Show more (${act.length - obShown})</button>` : '');
+  $('#obdead').innerHTML = dead.map((b, i) => obRow(b, i, true)).join('') || '<div class="mut">None.</div>';
+  const m = $('#obmore'); if (m) m.onclick = () => { obShown += 40; loadOBList(); };
+  document.querySelectorAll('#tab-ob .row.ob').forEach(x => x.onclick = () => {
+    const b = (x.dataset.d === '1' ? dead : act)[+x.dataset.i]; openChart(b.symbol, null, '5m', b);
+  });
+}
+// Shaded order-block zones over the candlestick chart (HTML overlay positioned from chart coordinates).
+function drawZones(cs, blocks, firstT, focus) {
+  const box = $('#chart'); if (!chart || !box) return;
+  let layer = $('#oblayer'); if (!layer) { layer = document.createElement('div'); layer.id = 'oblayer'; box.appendChild(layer); }
+  const ts = chart.timeScale(), w = ts.width();
+  const seen = {};  // same zone on 5m and 15m: draw once, label both
+  blocks = blocks.filter(b => { const k = b.top + '|' + b.bottom + '|' + b.status; if (seen[k]) { seen[k].tf2 = b.tf; return false; } seen[k] = b = Object.assign(b, {tf2: null}); return true; });
+  layer.innerHTML = blocks.map(b => {
+    const y1 = cs.priceToCoordinate(b.top), y2 = cs.priceToCoordinate(b.bottom);
+    if (y1 == null || y2 == null || (y1 < 0 && y2 < 0) || (y1 > box.clientHeight && y2 > box.clientHeight)) return '';
+    const xa = ts.timeToCoordinate(Math.max(b.formed_t, firstT)), xb = b.status_t ? ts.timeToCoordinate(b.status_t) : null;
+    const x1 = Math.max(0, xa == null ? 0 : xa), x2 = Math.min(w, xb == null ? w : xb);
+    if (x2 <= x1) return '';
+    const bull = b.type === 'BULL', on = focus && b.formed_t === focus.formed_t && b.tf === focus.tf;
+    return `<div class="obz ${bull ? 'bull' : 'bear'} ${b.status !== 'ACTIVE' ? 'dead' : ''} ${on ? 'on' : ''}" style="left:${x1}px;width:${x2 - x1}px;top:${Math.min(y1, y2)}px;height:${Math.max(2, Math.abs(y2 - y1))}px"><span>${bull ? 'Bull' : 'Bear'} OB ${b.tf}${b.tf2 ? '+' + b.tf2 : ''}${b.status !== 'ACTIVE' ? ' · ' + b.status.toLowerCase() : ''}</span></div>`;
+  }).join('');
 }
 
 // ---------------------------------------------------------------- options
@@ -248,7 +368,7 @@ async function loadGlobal() {
 // ---------------------------------------------------------------- chart bottom sheet
 let chart = null;
 function closeSheet() { $('#sheet').classList.add('hidden'); document.body.style.overflow = ''; if (chart) { chart.remove(); chart = null; } }
-async function openChart(symbol, alert = null, interval = '5m') {
+async function openChart(symbol, alert = null, interval = '5m', obFocus = null) {
   $('#sheet').classList.remove('hidden'); document.body.style.overflow = 'hidden';
   $('#sheet-title').textContent = `${symbol} · ${interval === '1d' ? 'daily' : '5-min IST'}`;
   if (alert) {
@@ -276,7 +396,18 @@ async function openChart(symbol, alert = null, interval = '5m') {
     cs.setMarkers([{time: alert.chart_time, position: alert.side === 'LONG' ? 'belowBar' : 'aboveBar', color: alert.side === 'LONG' ? '#00ff9c' : '#ff4d6a',
       shape: alert.side === 'LONG' ? 'arrowUp' : 'arrowDown', text: alert.rule}]);
   }
+  const obs = (r.data.order_blocks || []).filter(b => b.status !== 'ACTIVE' || Math.abs(b.dist_pct) <= 1.5 || (obFocus && b.formed_t === obFocus.formed_t));
+  if (obFocus) {
+    cs.createPriceLine({price: obFocus.top, color: obFocus.type === 'BULL' ? '#00ff9c' : '#ff4d6a', lineWidth: 1, lineStyle: 2, title: `${obFocus.type} OB ${obFocus.tf}`});
+    cs.createPriceLine({price: obFocus.bottom, color: obFocus.type === 'BULL' ? '#00ff9c' : '#ff4d6a', lineWidth: 1, lineStyle: 2, title: ''});
+    $('#sheet-why').innerHTML = `<div class="why"><b>${obFocus.type === 'BULL' ? 'BULLISH' : 'BEARISH'} ORDER BLOCK · ${obFocus.tf}</b><br>Zone ${obRange(obFocus)} · formed ${esc(obFocus.formed)} · structure broke ${esc(obFocus.bos)} · ${obFocus.status}${obFocus.status_at ? ' ' + esc(obFocus.status_at) : ''}</div>`;
+  }
   chart.timeScale().fitContent();
+  if (obs.length && r.data.bars.length) {
+    const redraw = () => requestAnimationFrame(() => drawZones(cs, obs, r.data.bars[0].time, obFocus));
+    chart.timeScale().subscribeVisibleLogicalRangeChange(redraw); chart.subscribeCrosshairMove(redraw);
+    new ResizeObserver(redraw).observe($('#chart')); setTimeout(redraw, 60); setTimeout(redraw, 400);
+  }
   $('#sheet-title').textContent += ` · ${r.as_of}`;
 }
 $('#sheet-close').onclick = closeSheet;
@@ -285,8 +416,8 @@ $('#sheet').onclick = e => { if (e.target.id === 'sheet') closeSheet(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
 // ---------------------------------------------------------------- tabs, swipe, refresh
-const ORDER = ['pretrade', 'flow', 'options', 'setups', 'calm', 'screener', 'global'];
-const LOADERS = {pretrade: loadPretrade, flow: loadFlow, options: loadOptions, setups: loadSetups, calm: loadCalm, screener: loadScreener, global: loadGlobal};
+const ORDER = ['pretrade', 'flow', 'ob', 'options', 'setups', 'calm', 'screener', 'global'];
+const LOADERS = {pretrade: loadPretrade, flow: loadFlow, ob: loadOB, options: loadOptions, setups: loadSetups, calm: loadCalm, screener: loadScreener, global: loadGlobal};
 let current = (location.hash || '#pretrade').slice(1);
 if (!LOADERS[current]) current = 'pretrade';
 function show(tab, scroll = false) {  // only the active tab is rendered (lazy)

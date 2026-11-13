@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="static/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="static/icon.svg">
-<link rel="stylesheet" href="static/style.css?v=5">
+<link rel="stylesheet" href="static/style.css?v=8">
 </head>
 <body>
 <header class="top">
@@ -22,7 +22,8 @@
 </header>
 <nav id="tabs" aria-label="Sections">
   <button data-tab="pretrade" class="active"><i>✓</i><span>Pre-Trade</span></button>
-  <button data-tab="flow"><i>⇅</i><span>Flow</span></button>
+  <button data-tab="flow"><i>⇅</i><span>Money Flow</span></button>
+  <button data-tab="ob"><i>▤</i><span>Order Blocks</span></button>
   <button data-tab="options"><i>◎</i><span>Options</span></button>
   <button data-tab="setups"><i>⚡</i><span>Setups</span></button>
   <button data-tab="calm"><i>≈</i><span>Calm</span></button>
@@ -32,6 +33,7 @@
 <main id="main">
   <section id="tab-pretrade" class="tab active"></section>
   <section id="tab-flow" class="tab"></section>
+  <section id="tab-ob" class="tab"></section>
   <section id="tab-options" class="tab"></section>
   <section id="tab-setups" class="tab"></section>
   <section id="tab-calm" class="tab"></section>
@@ -47,6 +49,6 @@
   </div>
 </div>
 <script src="static/vendor/lightweight-charts.js" defer></script>
-<script src="static/app.js?v=5" defer></script>
+<script src="static/app.js?v=8" defer></script>
 </body>
 </html>
