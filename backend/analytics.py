@@ -384,17 +384,25 @@ def candles(name: str, interval="5m"):
             d = S.yf_download([sym], "6mo", "1d", f"yf:c1d:{sym}", S.ttl(600, 3600))[sym]
             day = d
             vw = None
+            obs = None
         else:
             d = S.yf_download([sym], "5d", "5m", f"yf:c5:{sym}", S.ttl(60, 900))[sym]
             day = with_vwap(last_session(d))
             vw = [{"time": int(t.timestamp()) + 19800, "value": _r(v)} for t, v in day["VWAP"].items()]
+            try:
+                from .smc import blocks_for
+                ob = blocks_for(d)
+                obs = [b for b in ob if b["status"] == "ACTIVE"] + \
+                    [b for b in ob if b["status"] != "ACTIVE" and b["status_t"] and b["status_t"] >= int(day.index[0].timestamp()) + 19800][-8:]
+            except Exception:
+                obs = None
     except Exception as e:
         return fail(e, "Yahoo")
     # lightweight-charts shows UTC; add +5:30 so the axis reads IST
     bars = [{"time": (int(t.timestamp()) + 19800) if interval != "1d" else t.strftime("%Y-%m-%d"),
              "open": _r(r.Open), "high": _r(r.High), "low": _r(r.Low), "close": _r(r.Close)}
             for t, r in day.iterrows()]
-    return ok({"symbol": pretty(sym), "interval": interval, "bars": bars, "vwap": vw,
+    return ok({"symbol": pretty(sym), "interval": interval, "bars": bars, "vwap": vw, "order_blocks": obs,
                "vwap_kind": (day["vwap_kind"].iloc[0] if vw else None)}, "Yahoo",
               as_of=(day.index[-1].strftime("%d-%b-%Y %H:%M IST") if interval != "1d" else
                      day.index[-1].strftime("%d-%b-%Y") + " daily bar") if len(day) else None)
